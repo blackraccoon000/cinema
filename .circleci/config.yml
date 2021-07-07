@@ -7,12 +7,12 @@ jobs:
     steps:
       - checkout
       - run:
-        name: Show current branch
-        command: echo ${CURRENT_BRANCH}
+          name: Show current branch
+          command: echo ${CURRENT_BRANCH}
       - restore_cache:
-        keys:
-          - app-{{ checksum "package.json" }}
-          - app-
+          keys:
+            - app-{{ checksum "package.json" }}
+            - app-
       - run:
           name: Install yarn
           command: npm install -g yarn
@@ -22,102 +22,102 @@ jobs:
       - save_cache:
           paths:
             - node_modules
-            key: app-{{ checksum "package.json" }}
+          key: app-{{ checksum "package.json" }}
 
     deploy-to-aws-s3:
       docker:
-      - image: circleci/node:14.17.0-buster
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - run:
-          name: Show current branch
-          command: echo ${CURRENT_BRANCH}
-      - run:
-          name: Installing AWS circleci
-          working_directory: /
-          command: |
-            sudo apt-get -y -qq update
-            sudo apt-get install -y awscli
-            sudo apt-get install -y python-pip python-dev build-essential
-      - run:
-          name: Build project
-          command: |
-            yarn install
-            yarn build
-            cd build
-            zip ../build.zip -r * .[^.]*
-            echo "Build complete"
-      - run:
-          name: Deploy to AWS S3
-          command: |
-            if [ "CURRENT_BRANCH" == "main" ]
-            then
-              aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_PRODUCTION_BUCKET} --delete
-            elif [ "CURRENT_BRANCH" == "staging" ]
-            then
-              aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_STAGING_BUCKET} --delete
-            else
-              aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_DEV_BUCKET} --delete
-            fi
+        - image: circleci/node:14.17.0-buster
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - run:
+            name: Show current branch
+            command: echo ${CURRENT_BRANCH}
+        - run:
+            name: Installing AWS circleci
+            working_directory: /
+            command: |
+              sudo apt-get -y -qq update
+              sudo apt-get install -y awscli
+              sudo apt-get install -y python-pip python-dev build-essential
+        - run:
+            name: Build project
+            command: |
+              yarn install
+              yarn build
+              cd build
+              zip ../build.zip -r * .[^.]*
+              echo "Build complete"
+        - run:
+            name: Deploy to AWS S3
+            command: |
+              if [ "CURRENT_BRANCH" == "main" ]
+              then
+                aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_PRODUCTION_BUCKET} --delete
+              elif [ "CURRENT_BRANCH" == "staging" ]
+              then
+                aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_STAGING_BUCKET} --delete
+              else
+                aws --region ${AWS_REGION} s3 sync ~/repo/build s3://${AWS_DEV_BUCKET} --delete
+              fi
 
     deploy-to-aws-cloudfront:
       docker:
         - image: circleci/node:14.17.0-buster
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - run:
-          name: Show current branch
-          command: echo ${CURRENT_BRANCH}
-      - run:
-          name: Installing AWS circleci
-          working_directory: /
-          command: |
-            sudo apt-get -y -qq update
-            sudo apt-get install -y awscli
-            sudo apt-get install -y python-pip python-dev build-essential
-      - run:
-          name: Build project
-          command: |
-            yarn install
-            yarn build
-            cd build
-            zip ../build.zip -r * .[^.]*
-            echo "Build complete"
-      - run:
-          name: Deploy to AWS Cloudfront
-          command: |
-            if [ "CURRENT_BRANCH" == "main" ]
-            aws configure set preview.cloudfront
-            then
-              aws cloudfront create-invalidation --distribution-id ${PRODUCTION_DISTRIBUTE_ID} --paths /\*
-            elif [ "CURRENT_BRANCH" == "staging" ]
-            then
-              aws cloudfront create-invalidation --distribution-id ${STAGING_DESTRIBUTION_ID} --paths /\*
-            else
-              aws cloudfront create-invalidation --distribution-id ${DEV_DISTRIBUTION_ID} --paths /\*
-            fi
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - run:
+            name: Show current branch
+            command: echo ${CURRENT_BRANCH}
+        - run:
+            name: Installing AWS circleci
+            working_directory: /
+            command: |
+              sudo apt-get -y -qq update
+              sudo apt-get install -y awscli
+              sudo apt-get install -y python-pip python-dev build-essential
+        - run:
+            name: Build project
+            command: |
+              yarn install
+              yarn build
+              cd build
+              zip ../build.zip -r * .[^.]*
+              echo "Build complete"
+        - run:
+            name: Deploy to AWS Cloudfront
+            command: |
+              if [ "CURRENT_BRANCH" == "main" ]
+              aws configure set preview.cloudfront
+              then
+                aws cloudfront create-invalidation --distribution-id ${PRODUCTION_DISTRIBUTE_ID} --paths /\*
+              elif [ "CURRENT_BRANCH" == "staging" ]
+              then
+                aws cloudfront create-invalidation --distribution-id ${STAGING_DESTRIBUTION_ID} --paths /\*
+              else
+                aws cloudfront create-invalidation --distribution-id ${DEV_DISTRIBUTION_ID} --paths /\*
+              fi
 
-  workflow:
-    build_and_deploy:
-      jobs:
-        - build
-        - deploy-to-aws-s3:
-            requires:
-              - build
-            filters:
-              branches:
-                only:
-                  - develop
-                  - staging
-                  - main
-        - deploy-to-aws-cloudfront:
-            requires:
-              - deploy-to-aws-s3
-            filters:
-              branches:
-                only:
-                  - develop
-                  - staging
-                  - main
+workflows:
+  build_and_deploy:
+    jobs:
+     - build
+      - deploy-to-aws-s3:
+          requires:
+            - build
+          filters:
+            branches:
+              only:
+                - develop
+                - staging
+                - main
+      - deploy-to-aws-cloudfront:
+          requires:
+            - deploy-to-aws-s3
+          filters:
+            branches:
+              only:
+                - develop
+                - staging
+                - main
